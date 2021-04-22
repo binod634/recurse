@@ -1,0 +1,90 @@
+#!/usr/bin/env python3
+# importing
+import sys
+import time
+import requests
+import _thread
+
+# args
+if (len(sys.argv)==4):
+  dmn=sys.argv[1]
+  wrd_list=sys.argv[2]
+  ext=['/',".php",".txt",".bak",".html"]
+  thread_count=int(sys.argv[3])
+  total_thread_count=thread_count
+  chk_dir=['']
+  found_files=[]
+  found_dir=[]
+  path=''
+  wrds=[]
+else:
+  print("Usage:- "+sys.argv[0]+" URL File Thread_count")
+  exit()
+
+#logic
+def add_words():
+  global wrd_list
+  file=open(wrd_list)
+  global wrds
+  r=file.readline()
+  while (r!=''):
+    r=str.replace(r,"\n","",-1)
+    if "." not in r:
+      wrds.append(r)
+    r=file.readline()
+  file.close()
+
+def live_chk(url):
+  try:
+    r=requests.get(url)
+  except:
+    print("!!! ERROR FOUND !!!")
+    print("Possible reason:- Server is offline...")
+    exit()
+
+def find_sub(url,path,chk_ext):
+  global chk_dir
+  global found_files
+  global thread_count
+  print("URL: "+url+path+" Ext: "+chk_ext)
+  for b in range(0,(len(wrds))):
+    r=requests.get(url+path+wrds[b]+chk_ext)
+    if (r.status_code!=404):
+      if ((r.status_code==302 or r.status_code==200) and ( "." not in chk_ext )):
+        chk_dir.append(path+wrds[b]+chk_ext)    # appending found dir
+      else:
+        found_files.append(path+wrds[b]+chk_ext)  # appending found files
+  if not path in found_dir:   # appending the path if not present
+    found_dir.append(path)
+  thread_count +=1
+
+
+live_chk(dmn)
+add_words()
+print("=============>> STARTING RECURSIVE SUB-DIRECTORY ENUMERATION <<============")
+while (len(chk_dir)!=0):
+  for a in range(len(chk_dir)):
+    for b in range(len(ext)):
+      if (thread_count > 0):
+        try:
+          _thread.start_new_thread(find_sub,(dmn,chk_dir[0],ext[b],))
+          thread_count -=1
+        except:
+          print("Failed to Start Thread: "+str(b)+"\nRetrying...")
+          b -=1
+      else:
+        time.sleep(5) # time to wait for any thread to complete
+        b -=1   # to retry same
+    chk_dir.remove(chk_dir[0])
+  while (total_thread_count!=thread_count):   # wait for all thread to complete
+    time.sleep(10)   # time to wait for all thread to complete
+
+print("=============>> End of Recursive enumeration <<=================\n")
+print("=====>> Found Dir <<=====")
+for a in range(len(found_dir)):
+  print(found_dir[a])
+
+print("=====>> Found Files <<=====")
+for a in range(len(found_files)):
+  print(found_files[a])
+print("!!!!!!! EXITIING !!!!!!!!!")
